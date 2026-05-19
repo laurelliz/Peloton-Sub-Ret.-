@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Peloton | Subscriber Retention Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f6; color: #1a1a1a; }
+
+  header {
+    background: #1a1a1a;
+    color: white;
+    padding: 16px 28px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 3px solid #e8002d;
+  }
+  header .logo { font-size: 22px; font-weight: 900; letter-spacing: 3px; }
+  header .subtitle { font-size: 12px; color: #aaa; margin-top: 2px; }
+  header .badge {
+    margin-left: auto;
+    background: #e8002d;
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+  }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 20px; }
+
+  /* KPI Row */
+  .kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+  .kpi-card {
+    background: white;
+    border-radius: 10px;
+    padding: 16px;
+    border-top: 4px solid #ccc;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .kpi-card.green { border-top-color: #22c55e; }
+  .kpi-card.red { border-top-color: #e8002d; }
+  .kpi-card.yellow { border-top-color: #f59e0b; }
+  .kpi-card.blue { border-top-color: #3b82f6; }
+  .kpi-card.purple { border-top-color: #8b5cf6; }
+  .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #666; margin-bottom: 6px; }
+  .kpi-value { font-size: 26px; font-weight: 800; }
+  .kpi-delta { font-size: 11px; margin-top: 4px; color: #888; }
+  .kpi-delta.pos { color: #22c55e; }
+  .kpi-delta.neg { color: #e8002d; }
+
+  /* Main Grid */
+  .main-grid { display: grid; grid-template-columns: 340px 1fr; gap: 16px; }
+
+  /* Levers Panel */
+  .levers-panel {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .panel-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #1a1a1a;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #f0f0f0;
+  }
+  .lever-group { margin-bottom: 18px; }
+  .lever-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .lever-name { font-size: 12px; font-weight: 600; color: #333; }
+  .lever-val {
+    font-size: 13px;
+    font-weight: 800;
+    color: #e8002d;
+    background: #fff5f5;
+    padding: 2px 8px;
+    border-radius: 4px;
+    min-width: 60px;
+    text-align: center;
+  }
+  .lever-desc { font-size: 10px; color: #999; margin-bottom: 6px; }
+  input[type=range] {
+    width: 100%;
+    accent-color: #e8002d;
+    cursor: pointer;
+  }
+  .lever-range { display: flex; justify-content: space-between; font-size: 9px; color: #bbb; }
+
+  .reset-btn {
+    width: 100%;
+    background: #1a1a1a;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    margin-top: 8px;
+    transition: background 0.2s;
+  }
+  .reset-btn:hover { background: #e8002d; }
+
+  /* Right Panel */
+  .right-panel { display: flex; flex-direction: column; gap: 16px; }
+
+  /* Death Spiral */
+  .spiral-card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    border: 2px solid #e0e0e0;
+    transition: border-color 0.4s;
+  }
+  .spiral-card.danger { border-color: #e8002d; background: #fff8f8; }
+  .spiral-card.warning { border-color: #f59e0b; background: #fffbf0; }
+  .spiral-card.safe { border-color: #22c55e; background: #f0fdf4; }
+
+  .spiral-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .spiral-icon { font-size: 24px; }
+  .spiral-title { font-size: 14px; font-weight: 800; }
+  .spiral-subtitle { font-size: 11px; color: #666; }
+
+  .risk-meter { margin: 12px 0; }
+  .risk-bar-bg {
+    height: 14px;
+    background: linear-gradient(to right, #22c55e 0%, #f59e0b 50%, #e8002d 100%);
+    border-radius: 7px;
+    position: relative;
+    overflow: visible;
+  }
+  .risk-needle {
+    position: absolute;
+    top: -4px;
+    width: 22px;
+    height: 22px;
+    background: #1a1a1a;
+    border: 3px solid white;
+    border-radius: 50%;
+    transform: translateX(-50%);
+    transition: left 0.5s ease;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  .risk-labels { display: flex; justify-content: space-between; font-size: 9px; color: #888; margin-top: 6px; }
+
+  .spiral-factors { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .factor-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: #f8f8f8;
+  }
+  .factor-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .factor-dot.red { background: #e8002d; }
+  .factor-dot.yellow { background: #f59e0b; }
+  .factor-dot.green { background: #22c55e; }
+
+  /* Charts Row */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .chart-card {
+    background: white;
+    border-radius: 10px;
+    padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .chart-title { font-size: 12px; font-weight: 700; color: #333; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Bar Chart */
+  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 120px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .bar-wrap { width: 100%; display: flex; justify-content: center; align-items: flex-end; height: 100px; }
+  .bar {
+    width: 70%;
+    border-radius: 4px 4px 0 0;
+    transition: height 0.5s ease;
+    position: relative;
+  }
+  .bar-label { font-size: 9px; color: #999; text-align: center; }
+  .bar-val { font-size: 10px; font-weight: 700; color: #333; }
+
+  /* Waterfall */
+  .waterfall { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-top: 10px; }
+  .wf-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
+  .wf-bar {
+    width: 80%;
+    border-radius: 3px 3px 0 0;
+    transition: height 0.5s ease;
+  }
+  .wf-label { font-size: 9px; color: #999; text-align: center; margin-top: 4px; }
+
+  /* Scenario Table */
+  .scenario-card {
+    background: white;
+    border-radius: 10px;
+    padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th {
+    background: #1a1a1a;
+    color: white;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.5px;
+  }
+  td { padding: 7px 10px; border-bottom: 1px solid #f0f0f0; }
+  tr:hover td { background: #fafafa; }
+  .tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .tag.green { background: #dcfce7; color: #166534; }
+  .tag.yellow { background: #fef9c3; color: #854d0e; }
+  .tag.red { background: #fee2e2; color: #991b1b; }
+
+  /* Footnote */
+  .footnote {
+    font-size: 10px;
+    color: #aaa;
+    text-align: center;
+    margin-top: 16px;
+    padding-bottom: 20px;
+  }
+
+  .highlight-row td { font-weight: 700; background: #fff8f8 !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">PELOTON</div>
+    <div class="subtitle">Subscriber Retention Analysis · Engagement Team · Confidential</div>
+  </div>
+  <div class="badge">CFO BRIEFING · FY2025</div>
+</header>
+
+<div class="container">
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi-card red">
+      <div class="kpi-label">Paid CFS Subscribers</div>
+      <div class="kpi-value" id="kpi-subs">2.80M</div>
+      <div class="kpi-delta neg" id="kpi-subs-delta">▼ 5.9% YoY (FY2025 Actual)</div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">Monthly Churn Rate</div>
+      <div class="kpi-value" id="kpi-churn">1.6%</div>
+      <div class="kpi-delta" id="kpi-churn-delta">Avg Net Monthly (FY2025)</div>
+    </div>
+    <div class="kpi-card blue">
+      <div class="kpi-label">Subscription Revenue</div>
+      <div class="kpi-value" id="kpi-rev">$1.71B</div>
+      <div class="kpi-delta" id="kpi-rev-delta">Est. annualized @ current ARPU</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">12-Mo Projected Subs</div>
+      <div class="kpi-value" id="kpi-proj">2.52M</div>
+      <div class="kpi-delta neg" id="kpi-proj-delta">Scenario output</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-label">Death Spiral Risk</div>
+      <div class="kpi-value" id="kpi-risk">MEDIUM</div>
+      <div class="kpi-delta" id="kpi-risk-delta">Adjust levers to model</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- Levers Panel -->
+    <div class="levers-panel">
+      <div class="panel-title">🎚 Scenario Levers</div>
+
+      <div class="lever-group">
+        <div class="lever-header">
+          <span class="lever-name">Monthly Churn Rate</span>
+          <span class="lever-val" id="val-churn">1.6%</span>
+        </div>
+        <div class="lever-desc">Net monthly paid subscriber churn. FY2025 actual: 1.6%. Industry best-in-class: ~0.8%.</div>
+        <input type="range" id="sl-churn" min="0.5" max="5.0" step="0.1" value="1.6">
+        <div class="lever-range"><span>0.5% (Best)</span><span>5.0% (Crisis)</span></div>
+      </div>
+
+      <div class="lever-group">
+        <div class="lever-header">
+          <span class="lever-name">Monthly New Subscriber Adds</span>
+          <span class="lever-val" id="val-adds">30K</span>
+        </div>
+        <div class="lever-desc">Gross new paid CFS subs per month from hardware sales + app growth.</div>
+        <input type="range" id="sl-adds" min="5" max="120" step="5" value="30">
+        <div class="lever-range"><span>5K (Stalled)</span><span>120K (Growth)</span></div>
+      </div>
+
+      <div class="lever-group">
+        <div class="lever-header">
+          <span class="lever-name">Monthly Subscription Price ($)</span>
+          <span class="lever-val" id="val-price">$44</span>
+        </div>
+        <div class="lever-desc">Connected Fitness subscription ARPU. Price increases risk churn acceleration.</div>
+        <input type="range" id="sl-price" min="30" max="65" step="1" value="44">
+        <div class="lever-range"><span>$30 (Discount)</span><span>$65 (Premium)</span></div>
+      </div>
+
+      <div class="lever-group">
+        <div class="lever-header">
+          <span class="lever-name">Content Investment Index</span>
+          <span class="lever-val" id="val-content">100</span>
+        </div>
+        <div class="lever-desc">Relative content spend vs. FY2025 baseline (100). Drives engagement & retention.</div>
+        <input type="range" id="sl-content" min="40" max="160" step="5" value="100">
+        <div class="lever-range"><span>40 (Cuts)</span><span>160 (Invest)</span></div>
+      </div>
+
+      <div class="lever-group">
+        <div class="lever-header">
+          <span class="lever-name">Hardware Unit Sales / Mo (K)</span>
+          <span class="lever-val" id="val-hw">18K</span>
+        </div>
+        <div class="lever-desc">Connected Fitness hardware units sold monthly. Each unit = ~1 new subscriber.</div>
+        <input type="range" id="sl-hw" min="2" max="60" step="2" value="18">
+        <div class="lever-range"><span>2K (Declining)</span><span>60K (Surge)</span></div>
+      </div>
+
+      <div class="lever-group">
+        <div class="lever-header">
+          <span class="lever-name">Avg Workouts / Sub / Week</span>
+          <span class="lever-val" id="val-engage">3.2</span>
+        </div>
+        <div class="lever-desc">Engagement is the #1 predictor of retention. Higher usage = lower churn propensity.</div>
+        <input type="range" id="sl-engage" min="0.5" max="6.0" step="0.1" value="3.2">
+        <div class="lever-range"><span>0.5 (Disengaged)</span><span>6.0 (Power User)</span></div>
+      </div>
+
+      <div class="lever-group">
+        <div class="lever-header">
+          <span class="lever-name">Macro / Competition Pressure</span>
+          <span class="lever-val" id="val-macro">Medium</span>
+        </div>
+        <div class="lever-desc">External headwinds: gym reopening, Apple Fitness+, Lululemon Mirror, economic softness.</div>
+        <input type="range" id="sl-macro" min="1" max="3" step="1" value="2">
+        <div class="lever-range"><span>Low</span><span>High</span></div>
+      </div>
+
+      <button class="reset-btn" onclick="resetLevers()">↺ RESET TO FY2025 ACTUALS</button>
+    </div>
+
+    <!-- Right Panel -->
+    <div class="right-panel">
+
+      <!-- Death Spiral Card -->
+      <div class="spiral-card" id="spiral-card">
+        <div class="spiral-header">
+          <div class="spiral-icon" id="spiral-icon">⚠️</div>
+          <div>
+            <div class="spiral-title" id="spiral-title">MEDIUM RISK — Subscriber Erosion Underway</div>
+            <div class="spiral-subtitle" id="spiral-subtitle">Churn exceeds gross adds. Subscriber base contracting. Revenue pressure building.</div>
+          </div>
+        </div>
+
+        <div class="risk-meter">
+          <div class="risk-bar-bg">
+            <div class="risk-needle" id="risk-needle" style="left: 45%"></div>
+          </div>
+          <div class="risk-labels">
+            <span>STABLE</span>
+            <span>CAUTION</span>
+            <span>DEATH SPIRAL</span>
+          </div>
+        </div>
+
+        <div class="spiral-factors" id="spiral-factors">
+          <!-- dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Charts Row -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">📉 12-Month Subscriber Trajectory</div>
+          <div class="bar-chart" id="sub-chart"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">💰 Projected Annual Sub Revenue</div>
+          <div class="bar-chart" id="rev-chart"></div>
+        </div>
+      </div>
+
+      <!-- Scenario Comparison Table -->
+      <div class="scenario-card">
+        <div class="chart-title" style="margin-bottom:12px;">📊 Scenario Comparison vs. FY2025 Baseline</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Scenario</th>
+              <th>Churn</th>
+              <th>Gross Adds/Mo</th>
+              <th>12-Mo Subs</th>
+              <th>Annual Rev</th>
+              <th>Risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>FY2025 Actual</strong></td>
+              <td>1.6%</td>
+              <td>30K</td>
+              <td>2.52M</td>
+              <td>$1.33B</td>
+              <td><span class="tag yellow">MEDIUM</span></td>
+            </tr>
+            <tr>
+              <td>Best Case (Turnaround)</td>
+              <td>0.9%</td>
+              <td>60K</td>
+              <td>3.12M</td>
+              <td>$1.65B</td>
+              <td><span class="tag green">LOW</span></td>
+            </tr>
+            <tr>
+              <td>Base Case (Status Quo)</td>
+              <td>1.6%</td>
+              <td>30K</td>
+              <td>2.52M</td>
+              <td>$1.33B</td>
+              <td><span class="tag yellow">MEDIUM</span></td>
+            </tr>
+            <tr>
+              <td>Stress Case (Price Hike)</td>
+              <td>2.5%</td>
+              <td>20K</td>
+              <td>1.89M</td>
+              <td>$1.24B</td>
+              <td><span class="tag red">HIGH</span></td>
+            </tr>
+            <tr>
+              <td>Death Spiral Trigger</td>
+              <td>3.5%</td>
+              <td>10K</td>
+              <td>1.21M</td>
+              <td>$0.64B</td>
+              <td><span class="tag red">CRITICAL</span></td>
+            </tr>
+            <tr class="highlight-row" id="current-scenario-row">
+              <td>▶ Current Scenario</td>
+              <td id="tbl-churn">1.6%</td>
+              <td id="tbl-adds">30K</td>
+              <td id="tbl-subs">2.52M</td>
+              <td id="tbl-rev">$1.33B</td>
+              <td id="tbl-risk"><span class="tag yellow">MEDIUM</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footnote">
+    Source: Peloton Interactive 2025 Proxy Statement (FY2025 Actuals) · FY2025: 2.80M ending paid CFS subs · 1.6% avg net monthly churn · $2,490.8M total revenue · $323.7M Free Cash Flow<br>
+    ⚠️ This widget uses illustrative modeling assumptions. All projections are for internal scenario analysis only and do not constitute financial guidance.
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const BASELINE_SUBS = 2800000;
+const MONTHS = 12;
+
+const levers = {
+  churn:   { id: 'sl-churn',   valId: 'val-churn',   fmt: v => v.toFixed(1) + '%' },
+  adds:    { id: 'sl-adds',    valId: 'val-adds',    fmt: v => Math.round(v) + 'K' },
+  price:   { id: 'sl-price',   valId: 'val-price',   fmt: v => '$' + Math.round(v) },
+  content: { id: 'sl-content', valId: 'val-content', fmt: v => Math.round(v) },
+  hw:      { id: 'sl-hw',      valId: 'val-hw',      fmt: v => Math.round(v) + 'K' },
+  engage:  { id: 'sl-engage',  valId: 'val-engage',  fmt: v => v.toFixed(1) },
+  macro:   { id: 'sl-macro',   valId: 'val-macro',   fmt: v => ['', 'Low', 'Medium', 'High'][Math.round(v)] }
+};
+
+function getVals() {
+  return {
+    churn:   parseFloat(document.getElementById('sl-churn').value),
+    adds:    parseFloat(document.getElementById('sl-adds').value),
+    price:   parseFloat(document.getElementById('sl-price').value),
+    content: parseFloat(document.getElementById('sl-content').value),
+    hw:      parseFloat(document.getElementById('sl-hw').value),
+    engage:  parseFloat(document.getElementById('sl-engage').value),
+    macro:   parseFloat(document.getElementById('sl-macro').value)
+  };
+}
+
+// ─── Compute ─────────────────────────────────────────────────────────────────
+function computeEffectiveChurn(v) {
+  let c = v.churn;
+  // Content investment modifies churn
+  c += (100 - v.content) * 0.008;
+  // Engagement modifies churn
+  c -= (v.engage - 3.2) * 0.12;
+  // Macro pressure
+  c += (v.macro - 2) * 0.25;
+  // Price sensitivity
+  if (v.price > 50) c += (v.price - 50) * 0.04;
+  if (v.price < 38) c -= (38 - v.price) * 0.02;
+  return Math.max(0.3, Math.min(8.0, c));
+}
+
+function computeEffectiveAdds(v) {
+  let a = v.adds + v.hw;
+  a *= (v.content / 100) * 0.4 + 0.6;
+  if (v.price > 50) a *= 1 - (v.price - 50) * 0.01;
+  return Math.max(2, a);
+}
+
+function projectSubs(v) {
+  const effChurn = computeEffectiveChurn(v) / 100;
+  const effAdds  = computeEffectiveAdds(v) * 1000;
+  let subs = BASELINE_SUBS;
+  const trajectory = [subs];
+  for (let m = 0; m < MONTHS; m++) {
+    subs = subs * (1 - effChurn) + effAdds;
+    trajectory.push(Math.max(0, subs));
+  }
+  return trajectory;
+}
+
+function computeRiskScore(v) {
+  const effChurn = computeEffectiveChurn(v);
+  const effAdds  = computeEffectiveAdds(v) * 1000;
+  const netFlow  = effAdds - (BASELINE_SUBS * effChurn / 100);
+
+  let score = 0;
+  // Churn contribution (0-40)
+  score += Math.min(40, (effChurn / 5.0) * 40);
+  // Net flow contribution (0-30)
+  if (netFlow < 0) score += Math.min(30, Math.abs(netFlow) / 50000 * 30);
+  // Engagement (0-15)
+  score += Math.max(0, (3.2 - v.engage) / 3.2 * 15);
+  // Content (0-10)
+  score += Math.max(0, (100 - v.content) / 100 * 10);
+  // Macro (0-5)
+  score += (v.macro - 1) / 2 * 5;
+
+  return Math.min(100, Math.max(0, score));
+}
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function renderBarChart(containerId, labels, values, colors, maxVal) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  values.forEach((val, i) => {
+    const pct = Math.max(4, (val / maxVal) * 100);
+    el.innerHTML += `
+      <div class="bar-col">
+        <div class="bar-val">${labels[i] === 'Now' ? '' : ''}</div>
+        <div class="bar-wrap">
+          <div class="bar" style="height:${pct}%;background:${colors[i]};"></div>
+        </div>
+        <div class="bar-label">${labels[i]}</div>
+      </div>`;
+  });
+}
+
+function update() {
+  const v = getVals();
+
+  // Update lever display values
+  Object.entries(levers).forEach(([key, cfg]) => {
+    document.getElementById(cfg.valId).textContent = cfg.fmt(v[key]);
+  });
+
+  // Project
+  const trajectory = projectSubs(v);
+  const finalSubs  = trajectory[MONTHS];
+  const effChurn   = computeEffectiveChurn(v);
+  const annualRev  = finalSubs * v.price * 12;
+  const riskScore  = computeRiskScore(v);
+
+  // KPIs
+  document.getElementById('kpi-subs').textContent = (finalSubs / 1e6).toFixed(2) + 'M';
+  document.getElementById('kpi-churn').textContent = effChurn.toFixed(1) + '%';
+  document.getElementById('kpi-rev').textContent = '$' + (annualRev / 1e9).toFixed(2) + 'B';
+  document.getElementById('kpi-proj').textContent = (finalSubs / 1e6).toFixed(2) + 'M';
+
+  const churnDelta = effChurn - 1.6;
+  const subsDelta  = ((finalSubs - BASELINE_SUBS) / BASELINE_SUBS * 100).toFixed(1);
+  document.getElementById('kpi-subs-delta').textContent = (subsDelta >= 0 ? '▲ ' : '▼ ') + Math.abs(subsDelta) + '% vs. FY2025';
+  document.getElementById('kpi-subs-delta').className = 'kpi-delta ' + (subsDelta >= 0 ? 'pos' : 'neg');
+  document.getElementById('kpi-churn-delta').textContent = (churnDelta >= 0 ? '+' : '') + churnDelta.toFixed(1) + '% vs. FY2025 actual';
+
+  // Risk
+  let riskLabel, riskClass, icon, subtitle;
+  if (riskScore < 25) {
+    riskLabel = 'LOW'; riskClass = 'safe'; icon = '✅';
+    subtitle = 'Subscriber base is growing. Retention fundamentals are healthy.';
+  } else if (riskScore < 50) {
+    riskLabel = 'MEDIUM'; riskClass = 'warning'; icon = '⚠️';
+    subtitle = 'Churn exceeds gross adds. Subscriber base contracting. Revenue pressure building.';
+  } else if (riskScore < 72) {
+    riskLabel = 'HIGH'; riskClass = 'danger'; icon = '🔴';
+    subtitle = 'Accelerating subscriber loss. Content investment cuts risk further disengagement. Intervention required.';
+  } else {
+    riskLabel = 'CRITICAL — DEATH SPIRAL'; riskClass = 'danger'; icon = '💀';
+    subtitle = 'Self-reinforcing decline: fewer subs → less revenue → content cuts → more churn → fewer subs. Existential risk.';
+  }
+
+  document.getElementById('kpi-risk').textContent = riskLabel;
+  document.getElementById('kpi-risk-delta').textContent = 'Risk Score: ' + Math.round(riskScore) + '/100';
+  document.getElementById('spiral-card').className = 'spiral-card ' + riskClass;
+  document.getElementById('spiral-icon').textContent = icon;
+  document.getElementById('spiral-title').textContent = riskLabel + ' — Subscriber Retention Risk';
+  document.getElementById('spiral-subtitle').textContent = subtitle;
+  document.getElementById('risk-needle').style.left = riskScore + '%';
+
+  // Spiral factors
+  const effAdds = computeEffectiveAdds(v);
+  const netFlow = effAdds * 1000 - (BASELINE_SUBS * effChurn / 100);
+  const factors = [
+    { label: 'Churn Rate: ' + effChurn.toFixed(1) + '%', color: effChurn < 1.5 ? 'green' : effChurn < 2.5 ? 'yellow' : 'red' },
+    { label: 'Net Sub Flow: ' + (netFlow >= 0 ? '+' : '') + Math.round(netFlow / 1000) + 'K/mo', color: netFlow > 0 ? 'green' : netFlow > -30000 ? 'yellow' : 'red' },
+    { label: 'Engagement: ' + v.engage.toFixed(1) + 'x/wk', color: v.engage >= 3.5 ? 'green' : v.engage >= 2.0 ? 'yellow' : 'red' },
+    { label: 'Content Spend: ' + Math.round(v.content) + ' index', color: v.content >= 90 ? 'green' : v.content >= 65 ? 'yellow' : 'red' },
+    { label: 'Price Sensitivity', color: v.price <= 44 ? 'green' : v.price <= 54 ? 'yellow' : 'red' },
+    { label: 'Macro Pressure: ' + ['', 'Low', 'Med', 'High'][Math.round(v.macro)], color: v.macro <= 1 ? 'green' : v.macro <= 2 ? 'yellow' : 'red' },
+  ];
+  document.getElementById('spiral-factors').innerHTML = factors.map(f =>
+    `<div class="factor-item"><div class="factor-dot ${f.color}"></div>${f.label}</div>`
+  ).join('');
+
+  // Sub trajectory chart (quarterly snapshots)
+  const qLabels = ['Now', 'Q1', 'Q2', 'Q3', 'Q4'];
+  const qVals   = [0, 3, 6, 9, 12].map(i => trajectory[i]);
+  const maxSubs = Math.max(...qVals, 3500000);
+  const subColors = qVals.map((val, i) => {
+    if (i === 0) return '#3b82f6';
+    return val >= qVals[i - 1] ? '#22c55e' : '#e8002d';
+  });
+  renderBarChart('sub-chart', qLabels, qVals, subColors, maxSubs);
+  // Add M labels manually
+  const subBars = document.querySelectorAll('#sub-chart .bar-val');
+  qVals.forEach((v2, i) => { if (subBars[i]) subBars[i].textContent = (v2 / 1e6).toFixed(2) + 'M'; });
+
+  // Revenue chart
+  const revVals = qVals.map(s => s * v.price * 3);
+  const maxRev  = Math.max(...revVals, 500000000);
+  const revColors = revVals.map((val, i) => i === 0 ? '#8b5cf6' : val >= revVals[i - 1] ? '#22c55e' : '#e8002d');
+  renderBarChart('rev-chart', qLabels, revVals, revColors, maxRev);
+  const revBars = document.querySelectorAll('#rev-chart .bar-val');
+  revVals.forEach((rv, i) => { if (revBars[i]) revBars[i].textContent = '$' + (rv / 1e9).toFixed(2) + 'B'; });
+
+  // Table row
+  document.getElementById('tbl-churn').textContent = effChurn.toFixed(1) + '%';
+  document.getElementById('tbl-adds').textContent  = Math.round(effAdds) + 'K';
+  document.getElementById('tbl-subs').textContent  = (finalSubs / 1e6).toFixed(2) + 'M';
+  document.getElementById('tbl-rev').textContent   = '$' + (annualRev / 1e9).toFixed(2) + 'B';
+  document.getElementById('tbl-risk').innerHTML    = `<span class="tag ${riskScore < 25 ? 'green' : riskScore < 50 ? 'yellow' : 'red'}">${riskLabel.split('—')[0].trim()}</span>`;
+}
+
+function resetLevers() {
+  document.getElementById('sl-churn').value   = 1.6;
+  document.getElementById('sl-adds').value    = 30;
+  document.getElementById('sl-price').value   = 44;
+  document.getElementById('sl-content').value = 100;
+  document.getElementById('sl-hw').value      = 18;
+  document.getElementById('sl-engage').value  = 3.2;
+  document.getElementById('sl-macro').value   = 2;
+  update();
+}
+
+// Wire all sliders
+document.querySelectorAll('input[type=range]').forEach(el => el.addEventListener('input', update));
+
+// Initial render
+update();
+</script>
+</body>
+</html>
